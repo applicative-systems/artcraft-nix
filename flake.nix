@@ -26,4 +26,11 @@
 
       formatter = builtins.mapAttrs (system: pkgs: pkgs.nixfmt-tree) linuxPackages;
     };
+
+  nixConfig = {
+    extra-substituters = [ "https://applicative-systems.cachix.org" ];
+    extra-trusted-public-keys = [
+      "applicative-systems.cachix.org-1:ND41hRBh0ST2abuI/oee3yWVf3n0FsAftyJJ/Tb7KDE="
+    ];
+  };
 }
