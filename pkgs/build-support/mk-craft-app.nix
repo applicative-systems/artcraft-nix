@@ -7,7 +7,7 @@
 {
   lib,
   rustPlatform,
-  fetchFromGitHub,
+  craftSources,
   pkg-config,
   makeWrapper,
   wayland,
@@ -28,12 +28,7 @@
 
 {
   pname,
-  rev,
-  hash,
-  cargoHash,
   description,
-  # Release date of the pinned commit, for the AppStream metadata.
-  date,
   binaries ? [
     pname
     "${pname}-cli"
@@ -49,11 +44,16 @@
 }@args:
 
 let
-  src = fetchFromGitHub {
-    owner = "storytold";
-    repo = pname;
-    inherit rev hash;
-  };
+  src = craftSources.${pname};
+  inherit (src) rev;
+  date =
+    let
+      d = src.lastModifiedDate;
+      year = builtins.substring 0 4 d;
+      month = builtins.substring 4 2 d;
+      day = builtins.substring 6 2 d;
+    in
+    "${year}-${month}-${day}";
 
   version =
     (fromTOML (builtins.readFile (src + "/Cargo.toml"))).workspace.package.version
@@ -78,9 +78,6 @@ let
 in
 rustPlatform.buildRustPackage (
   removeAttrs args [
-    "rev"
-    "hash"
-    "date"
     "description"
     "binaries"
     "extraNativeBuildInputs"
@@ -93,9 +90,14 @@ rustPlatform.buildRustPackage (
       pname
       version
       src
-      cargoHash
       patches
       ;
+
+    cargoLock = {
+      lockFile = src + "/Cargo.lock";
+      # Git dependencies are all pinned to a rev in Cargo.lock, so no outputHashes are needed.
+      allowBuiltinFetchGit = true;
+    };
 
     cargoBuildFlags = [
       "--locked"
@@ -146,7 +148,7 @@ rustPlatform.buildRustPackage (
         lib.mapAttrsToList (
           crate:
           lib.concatMapStrings (p: ''
-            patch -p1 -d "$cargoDepsCopy/source-registry-0/${crate}" < ${p}
+            patch -p1 -d "$cargoDepsCopy/${crate}" < ${p}
           '')
         ) vendorPatches
       )

@@ -1,0 +1,96 @@
+// ┏┓╻+╻ ╱┏┳┓┏┓┏┳┓┏┓╻
+// ┃┃┃┃┗━┓╹┃╹┣┫┃┃┃┣┫┃   Read the manpage:
+// ╹┗┛╹╱ ╹ ╹ ╹╹╹ ╹╹╹┗┛  $ man nixtamal-manifest
+version "1.4.0"
+inputs {
+	nixpkgs {
+		archive fetch-time=eval {
+			url "https://github.com/NixOS/nixpkgs/archive/{{fresh_value}}.tar.gz"
+		}
+		hash algorithm=SHA-256
+		fresh-cmd {
+			$ git ls-remote "https://github.com/NixOS/nixpkgs.git" --refs "refs/heads/nixos-unstable"
+			| cut -f1
+		}
+	}
+	// Embedded into the apps at build time.
+	craft-fonts {
+		git fetch-time=build {
+			repository "https://github.com/storytold/craft-fonts.git"
+			branch "main"
+		}
+	}
+	// The apps are fetched at eval time: the builds read Cargo.toml & Cargo.lock from them.
+	cadcraft {
+		git fetch-time=eval {
+			repository "https://github.com/storytold/cadcraft.git"
+			branch "main"
+		}
+	}
+	deckcraft {
+		git fetch-time=eval {
+			repository "https://github.com/storytold/deckcraft.git"
+			branch "main"
+		}
+	}
+	designcraft {
+		git fetch-time=eval {
+			repository "https://github.com/storytold/designcraft.git"
+			branch "main"
+		}
+	}
+	effectcraft {
+		git fetch-time=eval {
+			repository "https://github.com/storytold/effectcraft.git"
+			branch "main"
+		}
+	}
+	filmcraft {
+		git fetch-time=eval {
+			repository "https://github.com/storytold/filmcraft.git"
+			branch "main"
+		}
+	}
+	gridcraft {
+		git fetch-time=eval {
+			repository "https://github.com/storytold/gridcraft.git"
+			branch "main"
+		}
+	}
+	lightcraft {
+		git fetch-time=eval {
+			repository "https://github.com/storytold/lightcraft.git"
+			branch "main"
+		}
+	}
+	pdfcraft {
+		git fetch-time=eval {
+			repository "https://github.com/storytold/pdfcraft.git"
+			branch "main"
+		}
+	}
+	photocraft {
+		git fetch-time=eval {
+			repository "https://github.com/storytold/photocraft.git"
+			branch "main"
+		}
+	}
+	soundcraft {
+		git fetch-time=eval {
+			repository "https://github.com/storytold/soundcraft.git"
+			branch "main"
+		}
+	}
+	vectorcraft {
+		git fetch-time=eval {
+			repository "https://github.com/storytold/vectorcraft.git"
+			branch "main"
+		}
+	}
+	wordcraft {
+		git fetch-time=eval {
+			repository "https://github.com/storytold/wordcraft.git"
+			branch "main"
+		}
+	}
+}

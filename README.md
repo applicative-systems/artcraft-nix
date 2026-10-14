@@ -44,3 +44,8 @@ Accept the flake's binary cache when Nix asks (or pass `--accept-flake-config`),
 | `wordcraft` | Word | [repo](https://github.com/storytold/wordcraft) | [web](https://getartcraft.com/apps/wordcraft) | [📷](https://github.com/storytold/wordcraft#a-tour) |
 
 An overlay is also available as `overlays.default`.
+
+## Updating
+
+All sources (Nixpkgs and app repos) are pinned with [Nixtamal](https://nixtamal.toast.al) in `nix/tamal/`.
+`nix run .#update` bumps everything to the latest commits (or pass app names to bump individually).

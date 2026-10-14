@@ -10,4 +10,9 @@ in
 lib.genAttrs appNames (name: prev.callPackage (./pkgs + "/${name}/package.nix") { })
 // {
   mkCraftApp = prev.callPackage ./pkgs/build-support/mk-craft-app.nix { };
+
+  craftSources = import ./nix/tamal {
+    inherit (prev.stdenv.hostPlatform) system;
+    bootstrap-nixpkgs = prev.path;
+  };
 }
