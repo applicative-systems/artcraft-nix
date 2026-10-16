@@ -6,7 +6,7 @@
     let
       inherit (import ./nix/tamal { system = "x86_64-linux"; }) nixpkgs;
       lib = import (nixpkgs + "/lib");
-      linuxPackages = lib.genAttrs [ "x86_64-linux" "aarch64-linux" ] (
+      pkgsBySystem = lib.genAttrs (lib.platforms.linux ++ lib.platforms.darwin) (
         system:
         import nixpkgs {
           inherit system;
@@ -20,7 +20,7 @@
 
       packages = builtins.mapAttrs (
         system: pkgs: lib.genAttrs appNames (name: pkgs.${name})
-      ) linuxPackages;
+      ) pkgsBySystem;
 
       apps = builtins.mapAttrs (system: pkgs: {
         update = {
@@ -31,11 +31,11 @@
             ''
           );
         };
-      }) linuxPackages;
+      }) pkgsBySystem;
 
       checks = inputs.self.packages;
 
-      formatter = builtins.mapAttrs (system: pkgs: pkgs.nixfmt-tree) linuxPackages;
+      formatter = builtins.mapAttrs (system: pkgs: pkgs.nixfmt-tree) pkgsBySystem;
     };
 
   nixConfig = {

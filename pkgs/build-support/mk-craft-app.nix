@@ -2,10 +2,12 @@
 #   apps/<name>        the desktop app (winit + wgpu)
 #   apps/<name>-cli    the headless CLI / MCP server
 #   packaging/linux/   ai.storyteller.<name>.{desktop,mime.xml,metainfo.xml.in}
-#   assets/app-icon/hicolor
+#   packaging/macos/   Info.plist.in
+#   assets/app-icon/   hicolor/ and <name>.icns
 # Modelled after lightcraft's own nix/package.nix.
 {
   lib,
+  stdenv,
   rustPlatform,
   craftSources,
   pkg-config,
@@ -36,6 +38,11 @@
   extraNativeBuildInputs ? [ ],
   extraBuildInputs ? [ ],
   extraRuntimeLibs ? [ ],
+  # Name of the macOS app bundle and its executable, e.g. "PdfCraft" for pdfcraft.
+  displayName ?
+    lib.toUpper (builtins.substring 0 1 pname)
+    + lib.removeSuffix "craft" (builtins.substring 1 (-1) pname)
+    + "Craft",
   patches ? [ ],
   # Patches for vendored crates.io dependencies: { "<crate>-<version>" = [ patch ... ]; }, applied
   # with -p1 inside the crate directory.
@@ -55,26 +62,28 @@ let
     in
     "${year}-${month}-${day}";
 
-  version =
-    (fromTOML (builtins.readFile (src + "/Cargo.toml"))).workspace.package.version
-    + "-unstable-${date}";
+  cargoVersion = (fromTOML (builtins.readFile (src + "/Cargo.toml"))).workspace.package.version;
+  version = "${cargoVersion}-unstable-${date}";
 
   appId = "ai.storyteller.${pname}";
   envPrefix = lib.toUpper pname;
 
+  inherit (stdenv.hostPlatform) isLinux isDarwin;
+
   # dlopen()ed at run time by winit / wgpu.
-  runtimeLibs = [
-    libxkbcommon
-    wayland
-    libx11
-    libxcb
-    libxcursor
-    libxi
-    libxrandr
-    vulkan-loader
-    libGL
-  ]
-  ++ extraRuntimeLibs;
+  runtimeLibs =
+    lib.optionals isLinux [
+      libxkbcommon
+      wayland
+      libx11
+      libxcb
+      libxcursor
+      libxi
+      libxrandr
+      vulkan-loader
+      libGL
+    ]
+    ++ extraRuntimeLibs;
 in
 rustPlatform.buildRustPackage (
   removeAttrs args [
@@ -83,6 +92,8 @@ rustPlatform.buildRustPackage (
     "extraNativeBuildInputs"
     "extraBuildInputs"
     "extraRuntimeLibs"
+    "displayName"
+    "platforms"
     "vendorPatches"
   ]
   // {
@@ -116,6 +127,8 @@ rustPlatform.buildRustPackage (
     nativeBuildInputs = [
       pkg-config
       makeWrapper
+    ]
+    ++ lib.optionals isLinux [
       wayland-scanner
       desktop-file-utils
       appstream
@@ -123,16 +136,17 @@ rustPlatform.buildRustPackage (
     ]
     ++ extraNativeBuildInputs;
 
-    buildInputs = [
-      wayland
-      libxkbcommon
-      libx11
-      libxcb
-      libxcursor
-      libxi
-      libxrandr
-    ]
-    ++ extraBuildInputs;
+    buildInputs =
+      lib.optionals isLinux [
+        wayland
+        libxkbcommon
+        libx11
+        libxcb
+        libxcursor
+        libxi
+        libxrandr
+      ]
+      ++ extraBuildInputs;
 
     env = {
       # Embeds the CJK fonts (official release builds do the same).
@@ -155,6 +169,13 @@ rustPlatform.buildRustPackage (
       + (args.postPatch or "");
 
     postInstall = ''
+      doc=$out/share/doc/${pname}
+      install -Dm644 -t "$doc" README.md LICENSE-MIT LICENSE-APACHE
+      for f in NOTICE ATTRIBUTION.md assets/ATTRIBUTION.md; do
+        [ -f "$f" ] && install -Dm644 "$f" "$doc/$(basename "$f")"
+      done
+    ''
+    + lib.optionalString isLinux ''
       install -Dm644 packaging/linux/${appId}.desktop $out/share/applications/${appId}.desktop
       install -Dm644 packaging/linux/${appId}.mime.xml $out/share/mime/packages/${appId}.xml
       mkdir -p $out/share/icons
@@ -165,17 +186,25 @@ rustPlatform.buildRustPackage (
         --subst-var-by VERSION ${version} \
         --subst-var-by DATE ${date}
 
-      doc=$out/share/doc/${pname}
-      install -Dm644 -t "$doc" README.md LICENSE-MIT LICENSE-APACHE
-      for f in NOTICE ATTRIBUTION.md assets/ATTRIBUTION.md; do
-        [ -f "$f" ] && install -Dm644 "$f" "$doc/$(basename "$f")"
-      done
-
       desktop-file-validate $out/share/applications/${appId}.desktop
 
       for bin in ${lib.concatMapStringsSep " " (b: "$out/bin/" + b) binaries}; do
         wrapProgram "$bin" --prefix LD_LIBRARY_PATH : "${lib.makeLibraryPath runtimeLibs}"
       done
+    ''
+    # Like packaging/macos/package.sh, minus the codesigning, notarization and DMG. The binary
+    # moves into the bundle (macOS finds Info.plist and the icon relative to the executable) and
+    # bin/ links to it.
+    + lib.optionalString isDarwin ''
+      app="$out/Applications/${displayName}.app/Contents"
+      install -Dm755 $out/bin/${pname} "$app/MacOS/${displayName}"
+      ln -sf "$app/MacOS/${displayName}" $out/bin/${pname}
+      install -Dm644 assets/app-icon/${pname}.icns "$app/Resources/${displayName}.icns"
+      substitute packaging/macos/Info.plist.in "$app/Info.plist" \
+        --subst-var-by VERSION ${version} \
+        --subst-var-by SHORT_VERSION ${cargoVersion} \
+        --subst-var-by BUILD_SHA ${rev}
+      printf 'APPL????' > "$app/PkgInfo"
     ''
     + (args.postInstall or "");
 
@@ -192,7 +221,7 @@ rustPlatform.buildRustPackage (
         lib.licenses.asl20
       ];
       sourceProvenance = [ lib.sourceTypes.fromSource ];
-      platforms = lib.platforms.linux;
+      platforms = lib.platforms.linux ++ lib.platforms.darwin;
       mainProgram = pname;
     }
     // (args.meta or { });
