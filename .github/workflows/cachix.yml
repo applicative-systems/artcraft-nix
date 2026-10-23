@@ -3,21 +3,39 @@ name: Build and push to Cache
 on:
   push:
     branches: [main]
+  pull_request:
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
+  packages:
+    runs-on: ubuntu-24.04
+    outputs:
+      names: ${{ steps.eval.outputs.names }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: cachix/install-nix-action@v31
+      - id: eval
+        run: echo "names=$(nix eval --json .#packages.x86_64-linux --apply builtins.attrNames)" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: packages
     strategy:
       fail-fast: false
       matrix:
-        include:
+        package: ${{ fromJSON(needs.packages.outputs.names) }}
+        platform:
           - system: x86_64-linux
             runner: ubuntu-24.04
           - system: aarch64-linux
             runner: ubuntu-24.04-arm
           - system: aarch64-darwin
             runner: macos-26
-    runs-on: ${{ matrix.runner }}
+    name: ${{ matrix.package }} (${{ matrix.platform.system }})
+    runs-on: ${{ matrix.platform.runner }}
     steps:
       - uses: actions/checkout@v5
       - uses: cachix/install-nix-action@v31
@@ -25,5 +43,5 @@ jobs:
         with:
           name: applicative-systems
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      - name: Build all packages
-        run: nix flake check -L
+      - name: Build ${{ matrix.package }}
+        run: nix build -L --no-link .#packages.${{ matrix.platform.system }}.${{ matrix.package }}

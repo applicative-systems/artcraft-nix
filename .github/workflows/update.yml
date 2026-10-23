@@ -13,6 +13,8 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-24.04
+    env:
+      HAS_PR_TOKEN: ${{ secrets.UPDATE_PR_TOKEN != '' }}
     steps:
       - uses: actions/checkout@v5
       - uses: cachix/install-nix-action@v31
@@ -21,13 +23,14 @@ jobs:
       - uses: peter-evans/create-pull-request@v7
         id: pr
         with:
+          token: ${{ secrets.UPDATE_PR_TOKEN || github.token }}
           branch: update-inputs
           delete-branch: true
           commit-message: "nix/tamal: update inputs"
           title: "Update inputs"
           body: Weekly `nix run .#update` (Nixtamal refresh of Nixpkgs and all app repos).
       - name: Build the PR
-        if: steps.pr.outputs.pull-request-operation == 'created' || steps.pr.outputs.pull-request-operation == 'updated'
+        if: env.HAS_PR_TOKEN != 'true' && (steps.pr.outputs.pull-request-operation == 'created' || steps.pr.outputs.pull-request-operation == 'updated')
         run: gh workflow run cachix.yml --ref update-inputs
         env:
           GH_TOKEN: ${{ github.token }}
