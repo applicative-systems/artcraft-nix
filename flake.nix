@@ -36,6 +36,15 @@
       checks = inputs.self.packages;
 
       formatter = builtins.mapAttrs (system: pkgs: pkgs.nixfmt-tree) pkgsBySystem;
+
+      devShells = builtins.mapAttrs (system: pkgs: {
+        default = pkgs.mkShell {
+          packages = [
+            pkgs.nixtamal
+            inputs.self.formatter.${system}
+          ];
+        };
+      }) pkgsBySystem;
     };
 
   nixConfig = {
