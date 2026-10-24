@@ -47,6 +47,7 @@
   # Patches for vendored crates.io dependencies: { "<crate>-<version>" = [ patch ... ]; }, applied
   # with -p1 inside the crate directory.
   vendorPatches ? { },
+  extraCargoBuildFlags ? [ ],
   ...
 }@args:
 
@@ -95,6 +96,7 @@ rustPlatform.buildRustPackage (
     "displayName"
     "platforms"
     "vendorPatches"
+    "extraCargoBuildFlags"
   ]
   // {
     inherit
@@ -116,7 +118,8 @@ rustPlatform.buildRustPackage (
     ++ lib.concatMap (b: [
       "-p"
       b
-    ]) binaries;
+    ]) binaries
+    ++ extraCargoBuildFlags;
 
     # The full workspace test suites take a long time and partly need a GPU; the upstream CI
     # covers them.
