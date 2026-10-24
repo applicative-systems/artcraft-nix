@@ -1,0 +1,10 @@
+--- a/crates/au-host/src/lib.rs
++++ b/crates/au-host/src/lib.rs
+@@ -193,7 +193,7 @@
+ #[cfg(target_os = "macos")]
+ mod api {
+-    use super::{AuDescriptor, AuError, Plugin, PluginInfo};
++    use super::{AuDescriptor, AuError, Plugin, PluginInfo, registry};
+ 
+     pub fn scan() -> Vec<AuDescriptor> {
+         registry::scan()
