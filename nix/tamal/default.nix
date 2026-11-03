@@ -20,14 +20,14 @@ OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 ────────────────────────────────────────────────────────────────────────────────
 */
 {
-	system ? builtins.currentSystem,
+	system ? null,
 	bootstrap-nixpkgs ? null,
 	bootstrap-nixpkgs-lock-name ? null,
 	bootstrap-pkgs ? null,
 }:
 
 let lock = builtins.fromJSON (builtins.readFile ./lock.json); in
-assert (lock.v == "1.4.0");
+assert (lock.v == "1.5.0");
 let
 	isNonemptyString = x: builtins.isString x && x != "";
 
@@ -123,7 +123,9 @@ let
 		if builtins.isAttrs bootstrap-pkgs then
 			bootstrap-pkgs
 		else
-			import local-bootstrap-nixpkgs { inherit system; };
+			import local-bootstrap-nixpkgs {
+				system = if builtins.isString system then system else builtins.currentSystem;
+			};
 
 	inherit (pkgs) lib;
 
