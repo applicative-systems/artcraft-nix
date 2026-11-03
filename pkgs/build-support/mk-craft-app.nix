@@ -64,6 +64,31 @@ let
     "${year}-${month}-${day}";
 
   cargoVersion = (fromTOML (builtins.readFile (src + "/Cargo.toml"))).workspace.package.version;
+
+  # importCargoLock only vendors [[package]] entries, not [[patch.unused]] ones, so offline cargo
+  # fails with "patch location ... does not contain packages matching ...". Since these patches
+  # are unused anyway, drop them from Cargo.toml and Cargo.lock.
+  unusedPatches = map (p: p.name) (
+    ((fromTOML (builtins.readFile (src + "/Cargo.lock"))).patch or { }).unused or [ ]
+  );
+  dropUnusedPatches = lib.optionalString (unusedPatches != [ ]) ''
+    awk -v names=${lib.escapeShellArg (lib.concatStringsSep " " unusedPatches)} '
+      BEGIN { n = split(names, a, " "); for (i = 1; i <= n; i++) drop[a[i]] = 1 }
+      /^\[/ { inPatch = ($0 ~ /^\[patch[.]/) }
+      inPatch { k = $1; gsub(/"/, "", k); if ((k in drop) && $2 == "=") next }
+      { print }
+    ' Cargo.toml > Cargo.toml.tmp
+    mv Cargo.toml.tmp Cargo.toml
+    awk '
+      /^\[\[patch[.]unused\]\]$/ { skip = 1; next }
+      skip && /^\[/ { skip = 0 }
+      !skip { print }
+    ' Cargo.lock > Cargo.lock.tmp
+    mv Cargo.lock.tmp Cargo.lock
+    # cargoSetupPostPatchHook checks that both lock files are identical.
+    rm -f "$cargoDepsCopy/Cargo.lock"
+    cp Cargo.lock "$cargoDepsCopy/Cargo.lock"
+  '';
   version = "${cargoVersion}-unstable-${date}";
 
   appId = "ai.storyteller.${pname}";
@@ -161,7 +186,8 @@ rustPlatform.buildRustPackage (
     // (args.env or { });
 
     postPatch =
-      lib.concatStrings (
+      dropUnusedPatches
+      + lib.concatStrings (
         lib.mapAttrsToList (
           crate:
           lib.concatMapStrings (p: ''
